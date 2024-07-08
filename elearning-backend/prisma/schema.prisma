@@ -1,0 +1,307 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email    String  @unique
+  avatar   String?
+  name     String
+  bio      String?
+  password String?
+  verified Boolean @default(false)
+  role     Role    @default(USER)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  userLessons         UserLesson[]
+  reviews             Review[]
+  stripeAccount       StripeAccount?
+  teachingCourses     Course[]           @relation("teacher")
+  comments            Comment[]
+  userCommentVotes    UserCommentVote[]
+  refreshTokens       RefreshToken[]
+  links               Link[]
+  courseEnrollments   CourseEnrollment[]
+  sourceNotifications Notification[]     @relation("source")
+  targetNotifications Notification[]     @relation("target")
+}
+
+model Link {
+  id      String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId  String  @db.Uuid
+  url     String
+  website Website
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model RefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  token     String   @unique
+  expiresAt DateTime @db.Timestamptz()
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model StripeAccount {
+  id               String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String  @unique @db.Uuid
+  accountId        String  @unique
+  chargesEnabled   Boolean @default(false)
+  payoutsEnabled   Boolean @default(false)
+  detailsSubmitted Boolean @default(false)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Course {
+  id               String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  description      String
+  price            Int
+  status           Status     @default(COMPLETED)
+  thumbnail        String
+  public           Boolean    @default(false)
+  department       Department
+  numberOfStudents Int        @default(0)
+  teacherId        String     @db.Uuid
+  rate             Float      @default(0)
+  sumRating        Int        @default(0)
+  totalRating      Int        @default(0)
+  duration         Int        @default(0)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  sections          Section[]
+  reviews           Review[]
+  teacher           User               @relation("teacher", fields: [teacherId], references: [id])
+  courseEnrollments CourseEnrollment[]
+}
+
+model CourseEnrollment {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId   String @db.Uuid
+  courseId String @db.Uuid
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model Review {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId   String  @db.Uuid
+  courseId String  @db.Uuid
+  content  String? @db.Text
+  rating   Rating
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user   User   @relation(fields: [userId], references: [id])
+  course Course @relation(fields: [courseId], references: [id])
+
+  @@unique([userId, courseId])
+}
+
+model Section {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title    String
+  courseId String @db.Uuid
+  order    Int
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  course  Course   @relation(fields: [courseId], references: [id])
+  lessons Lesson[]
+
+  @@unique([courseId, order])
+}
+
+model Lesson {
+  id        String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title     String
+  sectionId String  @db.Uuid
+  videoId   String? @unique @db.Uuid
+  order     Int
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  userLessons UserLesson[]
+  section     Section      @relation(fields: [sectionId], references: [id])
+  video       Video?       @relation(fields: [videoId], references: [id])
+  comments    Comment[]
+  questions   Question[]
+
+  @@unique([sectionId, order])
+}
+
+model Question {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  question String
+  lessonId String  @db.Uuid
+  explain  String?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  lesson  Lesson   @relation(fields: [lessonId], references: [id])
+  answers Answer[]
+}
+
+model Answer {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  answer     String
+  correct    Boolean @default(false)
+  questionId String  @db.Uuid
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  question Question @relation(fields: [questionId], references: [id])
+}
+
+model Comment {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId          String  @db.Uuid
+  lessonId        String  @db.Uuid
+  content         String
+  parentId        String? @db.Uuid
+  numberOfReplies Int     @default(0)
+  numberOfVotes   Int     @default(0)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user             User              @relation(fields: [userId], references: [id])
+  lesson           Lesson            @relation(fields: [lessonId], references: [id])
+  parent           Comment?          @relation("ChildComments", fields: [parentId], references: [id])
+  comment          Comment[]         @relation("ChildComments")
+  userCommentVotes UserCommentVote[]
+}
+
+model UserCommentVote {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String @db.Uuid
+  commentId String @db.Uuid
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user    User    @relation(fields: [userId], references: [id])
+  comment Comment @relation(fields: [commentId], references: [id])
+
+  @@unique([userId, commentId])
+}
+
+model Video {
+  id        String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  objectKey String @unique
+  duration  Int
+  status    Status @default(PENDING)
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+  lesson    Lesson?
+}
+
+model UserLesson {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId   String @db.Uuid
+  lessonId String @db.Uuid
+  score    Int?
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  user   User   @relation(fields: [userId], references: [id])
+  lesson Lesson @relation(fields: [lessonId], references: [id])
+
+  @@unique([userId, lessonId])
+}
+
+model Notification {
+  id           String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  targetUserId String           @db.Uuid
+  fromUserId   String           @db.Uuid
+  read         Boolean          @default(false)
+  resourceId   String           @db.Uuid
+  type         NotificationType
+
+  createdAt DateTime  @default(now()) @db.Timestamptz()
+  updatedAt DateTime? @updatedAt @db.Timestamptz()
+
+  sourceUser User @relation("source", fields: [fromUserId], references: [id])
+  targetUser User @relation("target", fields: [targetUserId], references: [id])
+}
+
+enum NotificationType {
+  NEW_REVIEW
+  NEW_COMMENT
+  NEW_REPLY
+  NEW_ENROLLMENT
+}
+
+enum Website {
+  GITHUB
+  LINKEDIN
+  TWITTER
+  FACEBOOK
+  INSTAGRAM
+  YOUTUBE
+}
+
+enum Rating {
+  ONE
+  TWO
+  THREE
+  FOUR
+  FIVE
+}
+
+enum Participation {
+  TUTOR
+  STUDENT
+}
+
+enum Status {
+  PENDING
+  COMPLETED
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum Department {
+  CNTT
+  COKHI
+  DIEN
+  KINHTE
+  OTHER
+}
